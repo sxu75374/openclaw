@@ -531,12 +531,14 @@ export async function runWithModelFallback<T>(params: {
     }
     const err = attemptRun.error;
     {
-      // Context overflow errors should be handled by the inner runner's
-      // compaction/retry logic, not by model fallback.  If one escapes as a
-      // throw, rethrow it immediately rather than trying a different model
-      // that may have a smaller context window and fail worse.
+      // Context overflow errors are normally handled by the inner runner's
+      // compaction/retry logic.  However, when the model's context window is
+      // fundamentally too small to hold even the system prompt (e.g. llama.cpp
+      // "n_keep >= n_ctx"), compaction cannot help.  In that case, falling
+      // back to a model with a larger context window is the correct recovery.
+      // We only rethrow when there are no remaining fallback candidates.
       const errMessage = err instanceof Error ? err.message : String(err);
-      if (isLikelyContextOverflowError(errMessage)) {
+      if (isLikelyContextOverflowError(errMessage) && i === candidates.length - 1) {
         throw err;
       }
       const normalized =
