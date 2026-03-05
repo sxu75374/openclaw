@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import * as os from "os";
 import * as fs from "fs";
+import * as os from "os";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   assessGatewayStartupMemory,
   formatBytes,
@@ -211,7 +211,7 @@ describe("startup-memory", () => {
       const message = formatMemoryAssessmentMessage(warnResult);
       expect(message).toContain("⚠️ Low memory warning");
       expect(message).toContain("1.50 GB");
-      expect(message).toContain("2.00 GB (recommended)");
+      expect(message).toContain("Recommended: 2.00 GB");
     });
 
     it("should format ok message correctly", () => {
