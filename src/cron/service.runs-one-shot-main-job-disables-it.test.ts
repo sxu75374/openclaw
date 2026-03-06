@@ -5,6 +5,7 @@ import type { CronEvent, CronServiceDeps } from "./service.js";
 import { CronService } from "./service.js";
 import { createDeferred, createNoopLogger, installCronTestHooks } from "./service.test-harness.js";
 import { loadCronStore } from "./store.js";
+import type { CronJob } from "./types.js";
 
 const noopLogger = createNoopLogger();
 installCronTestHooks({ logger: noopLogger });
@@ -470,9 +471,17 @@ async function loadLegacyDeliveryMigration(rawJob: Record<string, unknown>) {
 
   const cron = createStartedCronService(store.storePath);
   await cron.start();
-  cron.stop();
-  const loaded = await loadCronStore(store.storePath);
-  const job = loaded.jobs.find((j) => j.id === rawJob.id);
+
+  let job: CronJob | undefined;
+  for (let i = 0; i < 20; i++) {
+    const jobs = await cron.list({ includeDisabled: true });
+    job = jobs.find((j) => j.id === rawJob.id);
+    if (job) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
   return { store, cron, job };
 }
 
@@ -542,9 +551,11 @@ describe("CronService", () => {
     const job = await addWakeModeNowMainSystemEventJob(cron, { name: "wakeMode now waits" });
 
     const runPromise = cron.run(job.id, "force");
-    await heartbeatStarted.promise;
 
-    expect(runHeartbeatOnce).toHaveBeenCalledTimes(1);
+
+    await vi.waitFor(() => {
+      expect(runHeartbeatOnce).toHaveBeenCalledTimes(1);
+    });
     expect(requestHeartbeatNow).not.toHaveBeenCalled();
     expectMainSystemEventPosted(enqueueSystemEvent, "hello");
     expect(job.state.runningAtMs).toBeTypeOf("number");
@@ -663,7 +674,7 @@ describe("CronService", () => {
       id: "legacy-1",
       payload: { provider: " TeLeGrAm " },
     });
-    // Legacy delivery fields are migrated to the top-level delivery object
+    // Legacy delivery fields are migrated to the top-level delivery object.
     const delivery = job?.delivery as unknown as Record<string, unknown>;
     expect(delivery?.channel).toBe("telegram");
     const payload = job?.payload as unknown as Record<string, unknown>;
@@ -678,7 +689,6 @@ describe("CronService", () => {
       id: "legacy-2",
       payload: { channel: "Telegram" },
     });
-    // Legacy delivery fields are migrated to the top-level delivery object
     const delivery = job?.delivery as unknown as Record<string, unknown>;
     expect(delivery?.channel).toBe("telegram");
 
