@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DaemonActionResponse } from "./response.js";
 
 const loadConfigMock = vi.hoisted(() => vi.fn());
@@ -120,7 +120,12 @@ vi.mock("../../runtime.js", () => ({
 const { runDaemonInstall } = await import("./install.js");
 
 describe("runDaemonInstall", () => {
+  const originalGatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+  const originalClawdbotGatewayToken = process.env.CLAWDBOT_GATEWAY_TOKEN;
+
   beforeEach(() => {
+    delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    delete process.env.CLAWDBOT_GATEWAY_TOKEN;
     loadConfigMock.mockReset();
     readConfigFileSnapshotMock.mockReset();
     resolveGatewayPortMock.mockClear();
@@ -162,6 +167,19 @@ describe("runDaemonInstall", () => {
     isGatewayDaemonRuntimeMock.mockReturnValue(true);
     installDaemonServiceAndEmitMock.mockResolvedValue(undefined);
     service.isLoaded.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    if (originalGatewayToken === undefined) {
+      delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    } else {
+      process.env.OPENCLAW_GATEWAY_TOKEN = originalGatewayToken;
+    }
+    if (originalClawdbotGatewayToken === undefined) {
+      delete process.env.CLAWDBOT_GATEWAY_TOKEN;
+    } else {
+      process.env.CLAWDBOT_GATEWAY_TOKEN = originalClawdbotGatewayToken;
+    }
   });
 
   it("fails install when token auth requires an unresolved token SecretRef", async () => {
